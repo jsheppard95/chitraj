@@ -1,9 +1,14 @@
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+import warnings
+
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
 import pandas as pd
-from pathlib import Path
-import warnings
+
 
 if __name__ == "__main__":
     import scienceplots
@@ -32,63 +37,6 @@ def mean_from_distribution(r_nm: np.ndarray, P: np.ndarray) -> float:
     return np.sum(r_nm * P) / denom
 
 
-def bootstrap_mean_distribution(
-    P_frames: np.ndarray,
-    n_boot: int = 1000,
-    rng: np.random.Generator | None = None,
-) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Naive bootstrap over frames.
-    P_frames shape = (n_frames, n_r)
-    Returns lower/upper 95% CI for mean P(r).
-    """
-    if rng is None:
-        rng = np.random.default_rng(1234)
-
-    n_frames = P_frames.shape[0]
-    boot_means = np.empty((n_boot, P_frames.shape[1]), dtype=float)
-
-    for i in range(n_boot):
-        idx = rng.integers(0, n_frames, size=n_frames)
-        boot_means[i] = P_frames[idx].mean(axis=0)
-
-    lower = np.percentile(boot_means, 2.5, axis=0)
-    upper = np.percentile(boot_means, 97.5, axis=0)
-    return lower, upper
-
-
-def block_bootstrap_mean_scalar(
-    values: np.ndarray,
-    block_size: int,
-    n_boot: int = 1000,
-    rng: np.random.Generator | None = None,
-) -> tuple[float, float]:
-    """
-    Block bootstrap CI for a scalar time series, e.g. <r>_t.
-    """
-    if rng is None:
-        rng = np.random.default_rng(1234)
-
-    values = np.asarray(values, dtype=float)
-    values = values[np.isfinite(values)]
-    n = len(values)
-    if n == 0:
-        return np.nan, np.nan
-
-    n_blocks = int(np.ceil(n / block_size))
-    boot_stats = np.empty(n_boot, dtype=float)
-
-    for i in range(n_boot):
-        resampled = []
-        for _ in range(n_blocks):
-            start = rng.integers(0, max(1, n - block_size + 1))
-            resampled.append(values[start:start + block_size])
-        resampled = np.concatenate(resampled)[:n]
-        boot_stats[i] = np.mean(resampled)
-
-    return np.percentile(boot_stats, 2.5), np.percentile(boot_stats, 97.5)
-
-
 def analyze_trajectory_label_pair(
     universe,
     site1: int,
@@ -97,7 +45,8 @@ def analyze_trajectory_label_pair(
     r: np.ndarray,
     sample: int | None = None,
     rotlib: str | None = None,
-    stride: int = 100,
+    stride: int = 1,
+    start_frame: int = 0,
     max_frames: int | None = None,
 ):
     import chilife as xl
@@ -108,20 +57,29 @@ def analyze_trajectory_label_pair(
     P_frames = []
     mean_r_frames = []
 
-    n_done = 0
     skipped_frames = []
-    for ts in universe.trajectory[::stride]:
-        if max_frames is not None and n_done >= max_frames:
-            break
 
-        print(f"Frame {ts.frame:6d}  time = {ts.time:10.3f} ps")
+    if max_frames is None:
+        stop_frame = None
+    else:
+        stop_frame = start_frame + max_frames * stride
+
+    traj_slice = universe.trajectory[start_frame:stop_frame:stride]
+
+    print(
+        f"Processing frames starting at {start_frame}, "
+        f"stop={stop_frame}, stride={stride}"
+    )
+
+    for ts in traj_slice:
+        print(f"Frame {ts.frame:6d}  time = {ts.time:10.3f} ps", flush=True)
+
         try:
             kwargs = {"site": site1, "protein": universe}
             if sample is not None:
                 kwargs["sample"] = sample
             if rotlib is not None:
                 kwargs["rotlib"] = rotlib
-
             L1 = xl.SpinLabel(label_name, **kwargs)
 
             kwargs = {"site": site2, "protein": universe}
@@ -137,7 +95,7 @@ def analyze_trajectory_label_pair(
                 raise ValueError("Non-finite or zero-sum distribution")
 
         except Exception as e:
-            print(f"Skipping frame {ts.frame}: {e}")
+            print(f"Skipping frame {ts.frame}: {e}", flush=True)
             skipped_frames.append(ts.frame)
             continue
 
@@ -147,16 +105,21 @@ def analyze_trajectory_label_pair(
         times_ps.append(ts.time)
         P_frames.append(P)
         mean_r_frames.append(mean_r)
-        n_done += 1
-    print(f"\nSkipped {len(skipped_frames)} frames out of {len(frame_ids)+len(skipped_frames)}")
-    pd.DataFrame({"frame": skipped_frames}).to_csv(
-        "skipped_frames.csv", index=False
-    )
-    P_frames = np.asarray(P_frames, dtype=float)
-    mean_r_frames = np.asarray(mean_r_frames, dtype=float)
-    times_ps = np.asarray(times_ps, dtype=float)
-    frame_ids = np.asarray(frame_ids, dtype=int)
 
+    print(
+        f"\nSkipped {len(skipped_frames)} frames out of "
+        f"{len(frame_ids) + len(skipped_frames)}",
+        flush=True,
+    )
+
+    frame_ids = np.asarray(frame_ids, dtype=int)
+    times_ps = np.asarray(times_ps, dtype=float)
+    mean_r_frames = np.asarray(mean_r_frames, dtype=float)
+
+    if len(P_frames) == 0:
+        raise RuntimeError("No valid frames were processed in this chunk.")
+
+    P_frames = np.asarray(P_frames, dtype=float)
     mean_P = np.mean(P_frames, axis=0)
     std_P = np.std(P_frames, axis=0, ddof=1) if len(P_frames) > 1 else np.zeros_like(mean_P)
 
@@ -168,131 +131,128 @@ def analyze_trajectory_label_pair(
         "mean_P": mean_P,
         "std_P": std_P,
         "r_nm": r_nm,
+        "skipped_frames": np.asarray(skipped_frames, dtype=int),
     }
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Chunked ChiLife distance-distribution analysis over trajectory frames."
+    )
+
+    parser.add_argument("--top1", required=True, help="Topology for condition 1")
+    parser.add_argument("--traj1", required=True, help="Trajectory for condition 1")
+    parser.add_argument("--top2", required=True, help="Topology for condition 2")
+    parser.add_argument("--traj2", required=True, help="Trajectory for condition 2")
+
+    parser.add_argument("--site1-cond1", type=int, required=True)
+    parser.add_argument("--site2-cond1", type=int, required=True)
+    parser.add_argument("--site1-cond2", type=int, required=True)
+    parser.add_argument("--site2-cond2", type=int, required=True)
+
+    parser.add_argument("--label-name", required=True, choices=["R1M", "GTN"])
+    parser.add_argument("--sample", type=int, default=None)
+    parser.add_argument("--rotlib", default=None)
+
+    parser.add_argument("--start-frame", type=int, default=0)
+    parser.add_argument("--max-frames", type=int, default=300)
+    parser.add_argument("--stride", type=int, default=1)
+
+    parser.add_argument("--r-min", type=float, default=0.0)
+    parser.add_argument("--r-max", type=float, default=80.0)
+    parser.add_argument("--r-npts", type=int, default=256)
+
+    parser.add_argument("--outdir", default="chunk_output")
+    parser.add_argument("--tag", default=None, help="Optional tag for output filenames")
+
+    return parser.parse_args()
 
 
 def main():
     import MDAnalysis as mda
 
-    base = Path(__file__).parent
+    args = parse_args()
+    outdir = Path(args.outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
 
-    # Example: replace with topology+trajectory
-    U1 = mda.Universe("./JS_1bar_equib_tip4p.pdb", "./JS_1bar.xtc")
-    U2 = mda.Universe("./JS_3kbar_equib_tip4p.pdb", "./JS_3kbar.xtc")
+    r = np.linspace(args.r_min, args.r_max, args.r_npts)
+
+    print("Loading universes...", flush=True)
+    U1 = mda.Universe(args.top1, args.traj1)
+    U2 = mda.Universe(args.top2, args.traj2)
+
+    # keep your original segid/chainID fix if needed
     U2.atoms.segments.segids = ["A"]
     U2.atoms.chainIDs = ["A"] * U2.atoms.n_atoms
 
-    sites_1bar = (406, 537)
-    sites_3kbar = (4, 135)
+    tag = args.tag
+    if tag is None:
+        sample_tag = "no_sample" if args.sample is None else f"sample_{args.sample}"
+        tag = f"{args.label_name}_{sample_tag}_start{args.start_frame}_n{args.max_frames}"
 
-    r = np.linspace(0, 80, 256)
-    rotlib = "GTN_rotlib.npz"  # GTN
-    #rotlib = None  # R1
+    print(f"Running chunk tag: {tag}", flush=True)
 
-    stride = 1
-    sample = 5000
-
-    print("Analyzing GTN trajectories (Sampling 5000)...")
-    res_1bar = analyze_trajectory_label_pair(
+    res_1 = analyze_trajectory_label_pair(
         universe=U1,
-        site1=sites_1bar[0],
-        site2=sites_1bar[1],
-        label_name="GTN",
+        site1=args.site1_cond1,
+        site2=args.site2_cond1,
+        label_name=args.label_name,
         r=r,
-        sample=sample,
-        rotlib=rotlib,
-        stride=stride,
-        max_frames=None,
+        sample=args.sample,
+        rotlib=args.rotlib,
+        stride=args.stride,
+        start_frame=args.start_frame,
+        max_frames=args.max_frames,
     )
 
-    res_3kbar = analyze_trajectory_label_pair(
+    res_2 = analyze_trajectory_label_pair(
         universe=U2,
-        site1=sites_3kbar[0],
-        site2=sites_3kbar[1],
-        label_name="GTN",
+        site1=args.site1_cond2,
+        site2=args.site2_cond2,
+        label_name=args.label_name,
         r=r,
-        sample=sample,
-        rotlib=rotlib,
-        stride=stride,
-        max_frames=None,
+        sample=args.sample,
+        rotlib=args.rotlib,
+        stride=args.stride,
+        start_frame=args.start_frame,
+        max_frames=args.max_frames,
     )
 
-    # Bootstrap CI for mean distribution
-    lo_1, hi_1 = bootstrap_mean_distribution(res_1bar["P_frames"], n_boot=500)
-    lo_3, hi_3 = bootstrap_mean_distribution(res_3kbar["P_frames"], n_boot=500)
-
-    # Block-bootstrap CI for scalar <r>
-    ci1_lo, ci1_hi = block_bootstrap_mean_scalar(
-        res_1bar["mean_r_frames"], block_size=5, n_boot=1000
-    )
-    ci3_lo, ci3_hi = block_bootstrap_mean_scalar(
-        res_3kbar["mean_r_frames"], block_size=5, n_boot=1000
-    )
-
-    mean_r_1 = np.mean(res_1bar["mean_r_frames"])
-    mean_r_3 = np.mean(res_3kbar["mean_r_frames"])
-
-    print(f"1 bar  <r> = {mean_r_1:.3f} nm   95% CI [{ci1_lo:.3f}, {ci1_hi:.3f}]")
-    print(f"3 kbar <r> = {mean_r_3:.3f} nm   95% CI [{ci3_lo:.3f}, {ci3_hi:.3f}]")
-
-    # Plot
-    fig, ax = plt.subplots(figsize=(5, 3.5))
-
-    r_nm = res_1bar["r_nm"]
-
-    ax.plot(
-        r_nm,
-        res_1bar["mean_P"],
-        label=rf"1 bar ($\langle r \rangle={mean_r_1:.2f}$ nm)",
-        linewidth=2.5,
-    )
-    ax.fill_between(r_nm, lo_1, hi_1, alpha=0.25)
-
-    ax.plot(
-        r_nm,
-        res_3kbar["mean_P"],
-        label=rf"3 kbar ($\langle r \rangle={mean_r_3:.2f}$ nm)",
-        linewidth=2.5,
-    )
-    ax.fill_between(r_nm, lo_3, hi_3, alpha=0.25)
-
-    ax.set_xlabel("Distance (nm)")
-    ax.set_ylabel(r"$P(r)$")
-    ax.set_xlim(1.5, 6.0)
-    ax.grid(True, alpha=0.3, linestyle=":", linewidth=0.5)
-    ax.legend()
-    fig.tight_layout()
-
-    fig.savefig(base / "stride_1/GTN_sample_5000_trajectory_average.png", dpi=600, bbox_inches="tight")
-
-    # Save per-frame summary
     summary_1 = pd.DataFrame({
         "condition": "1bar",
-        "frame": res_1bar["frame_ids"],
-        "time_ps": res_1bar["times_ps"],
-        "mean_distance_nm": res_1bar["mean_r_frames"],
+        "frame": res_1["frame_ids"],
+        "time_ps": res_1["times_ps"],
+        "mean_distance_nm": res_1["mean_r_frames"],
     })
-    summary_3 = pd.DataFrame({
+
+    summary_2 = pd.DataFrame({
         "condition": "3kbar",
-        "frame": res_3kbar["frame_ids"],
-        "time_ps": res_3kbar["times_ps"],
-        "mean_distance_nm": res_3kbar["mean_r_frames"],
+        "frame": res_2["frame_ids"],
+        "time_ps": res_2["times_ps"],
+        "mean_distance_nm": res_2["mean_r_frames"],
     })
-    pd.concat([summary_1, summary_3], ignore_index=True).to_csv(
-        base / "stride_1/GTN_sample_5000_per_frame_summary.csv", index=False
+
+    pd.concat([summary_1, summary_2], ignore_index=True).to_csv(
+        outdir / f"{tag}_per_frame_summary.csv",
+        index=False,
     )
 
-    # Save averaged distributions
-    dist_df = pd.DataFrame({
-        "r_nm": r_nm,
-        "P_1bar_mean": res_1bar["mean_P"],
-        "P_1bar_ci_low": lo_1,
-        "P_1bar_ci_high": hi_1,
-        "P_3kbar_mean": res_3kbar["mean_P"],
-        "P_3kbar_ci_low": lo_3,
-        "P_3kbar_ci_high": hi_3,
-    })
-    dist_df.to_csv(base / "stride_1/GTN_sample_5000_trajectory_distributions.csv", index=False)
+    np.savez_compressed(
+        outdir / f"{tag}_raw_distributions.npz",
+        r_nm=res_1["r_nm"],
+        frame_ids_1bar=res_1["frame_ids"],
+        times_ps_1bar=res_1["times_ps"],
+        P_frames_1bar=res_1["P_frames"],
+        mean_r_frames_1bar=res_1["mean_r_frames"],
+        skipped_frames_1bar=res_1["skipped_frames"],
+        frame_ids_3kbar=res_2["frame_ids"],
+        times_ps_3kbar=res_2["times_ps"],
+        P_frames_3kbar=res_2["P_frames"],
+        mean_r_frames_3kbar=res_2["mean_r_frames"],
+        skipped_frames_3kbar=res_2["skipped_frames"],
+    )
+
+    print("Chunk complete.", flush=True)
 
 
 if __name__ == "__main__":
