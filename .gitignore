@@ -1,0 +1,9 @@
+*.lock
+*_offsets.npz
+*_raw.npz
+*.bku
+*.xtc
+*.pdb
+*.csv
+
+stride_*/

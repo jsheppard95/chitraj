@@ -34,20 +34,20 @@ MODEL_FILES = [
     {
         "name": "R1M_sample_none",
         "title": "R1 Accessible Volume",
-        "dist_csv": BASE_DIR / "stride_100/R1M_sample_none_trajectory_distributions.csv",
-        "summary_csv": BASE_DIR / "stride_100/R1M_sample_none_per_frame_summary.csv",
+        "dist_csv": BASE_DIR / "stride_1/r1m_sample_none/combined_output/R1_no_sample_trajectory_distributions.csv",
+        "summary_csv": BASE_DIR / "stride_1/r1m_sample_none/combined_output/R1_no_sample_per_frame_summary.csv",
     },
     {
         "name": "R1M_sample_5000",
         "title": "R1 Off-Rotamer Sampling",
-        "dist_csv": BASE_DIR / "stride_100/R1M_sample_5000_trajectory_distributions.csv",
-        "summary_csv": BASE_DIR / "stride_100/R1M_sample_5000_per_frame_summary.csv",
+        "dist_csv": BASE_DIR / "stride_1/r1m_sample_5000/combined_output/R1_sample_5000_trajectory_distributions.csv",
+        "summary_csv": BASE_DIR / "stride_1/r1m_sample_5000/combined_output/R1_sample_5000_per_frame_summary.csv",
     },
     {
         "name": "GTN",
         "title": "GTN (Gd) Off-Rotamer Sampling",
-        "dist_csv": BASE_DIR / "stride_100/GTN_sample_5000_trajectory_distributions.csv",
-        "summary_csv": BASE_DIR / "stride_100/GTN_sample_5000_per_frame_summary.csv",
+        "dist_csv": BASE_DIR / "stride_1/gtn_sample_5000/combined_output/GTN_sample_5000_trajectory_distributions.csv",
+        "summary_csv": BASE_DIR / "stride_1/gtn_sample_5000/combined_output/GTN_sample_5000_per_frame_summary.csv",
     },
 ]
 
@@ -209,8 +209,8 @@ def main() -> None:
 
     fig.tight_layout()
 
-    out_png = BASE_DIR / "stride_100/trajectory_label_comparison_3panel.png"
-    out_pdf = BASE_DIR / "stride_100/trajectory_label_comparison_3panel.pdf"
+    out_png = BASE_DIR / "stride_1/trajectory_label_comparison_3panel.png"
+    out_pdf = BASE_DIR / "stride_1/trajectory_label_comparison_3panel.pdf"
     fig.savefig(out_png, dpi=1200, bbox_inches="tight")
     fig.savefig(out_pdf, bbox_inches="tight")
 
