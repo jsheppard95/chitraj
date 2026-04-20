@@ -1,17 +1,24 @@
 # chitraj
 
+Tools for computing and comparing DEER distance distributions from MD trajectories using ChiLife.
+
 ## Installation
+Create and activate the Conda environment, then install required plotting utilities:
 ```
 conda env create -f environment_linux.yml -n chilife_env
 conda activate chilife_env
 pip install SciencePlots
 ```
 
-## Usage
-Run ChiLife over MD trajectory to obtain DEER distribution for specified sites, averaged over MD trajectory.
+## Overview
+This workflow applies ChiLife to molecular dynamics (MD) trajectories to compute DEER distance distributions between specified residue pairs.
 
-### Basic Usage
-Compare distance distribution between residues 406 and 537 at 1 bar and 3 kbar. Note these residues are indexed 4 and 135 for 3 kbar. Compare R1 and GTN spin labels using MC sampling over corresponding rotamer libraries.
+Two primary modes are supported:
+- **Trajectory-based averaging** (frame-by-frame over MD)
+- **Cluster-based averaging** (ensemble-weighted using RMSD clusters)
+
+## Basic Usage
+Compute and compare distance distributions between two residues under two conditions (e.g., 1 bar vs. 3 kbar), using Monte Carlo sampling of spin-label rotamers.
 
 ```
 python compare_R1_rotlib_traj.py \
@@ -32,39 +39,74 @@ python compare_R1_rotlib_traj.py \
     --outdir gtn_sample_5000 \
     --tag GTN_sample_5000
 ```
-This creates the directory `gtn_sample_5000` containing per-frame summaries and the average distribution with 95% confidence intervals.
 
-### Trajectory Calculation
-Parallelization is achieved by "chunking" trajectory into pieces, with `CHUNK_SIZE` frames each, running each chunk within a SLURM job array.
+Notes:
+- Residue indices may differ between systems (e.g., 406/537 vs. 4/135).
+- `--sample` controls the number of Monte Carlo rotamer samples per frame.
+- `--stride` can be increased to reduce computational cost.
 
-In `submit_array.sh`, edit `TOP1` and `TRAJ1` to point to the first condition topology and trajectory files, `SITE_COND1` and `SITE_COND2` to the residues of interest, and similarly for the second condition. Also edit `MODE` to select the ChiLife rotamer library and number of MC samples.
+Output:
+- Per-frame distance summaries
+- Ensemble-averaged distributions with 95% confidence intervals
+- Results stored in the specified --outdir
+
+## Trajectory-Based Calculation (Parallelized)
+Large trajectories are processed by splitting into chunks and distributing across a SLURM job array.
+
+1. Submit jobs
+Edit `submit_array.sh`:
+- `TOP1`, `TRAJ1`, `TOP2`, `TRAJ2`
+- `SITE_COND1`, `SITE_COND2`
+- `MODE` (label type and sampling settings)
+
+Then run:
+
 ```
 sbatch submit_array.sh
 ```
 
-This will create directories `logs` and `chunk_output`. If any chunks fail, run the following bash script to re-run failed chunks. Note this should be run from the command line, not as a SLURM job.
+This creates:
+- `logs/`
+- `chunk_output`
+
+2. Re-run failed chunks
+If some jobs fail:
 
 ```
 ./submit_missing_chunks.sh
 ```
 
-This will inspect `chunk_output` and call `rerun_missing_chunks.sbatch`, again using a job array. Re-run `submit_missing_chunks.sh` as needed.
+This script:
+- Detects missing outputs in chunk_output/
+- Resubmits only failed chunks via SLURM array
 
-Combine ChiLife Chunks with the following python script:
+3. Combine chunk outputs
 ```
 python combine_chilife_chunks.py \
-    --chunk-dir stride_1/gtn_sample_5000/chunk_output
-    --prefix GTN_sample_5000
+    --chunk-dir stride_1/gtn_sample_5000/chunk_output \
+    --prefix GTN_sample_5000 \
     --outdir stride_1/gtn_sample_5000/combined_output
 ```
 
-Plot the combined output data, ensuring to edit `MODEL_FILES` to point to the combined output data produced by `combine_chilife_chunks.py`:
+4. Plot trajectory-averaged results
+Edit `MODEL_FILES` in the script as needed:
+
 ```
 python plot_R1_rotlib_traj.py
 ```
 
-### Cluster Calculation
-Computes an ensemble-averaged distribution by running ChiLife over RMSD-determined clusters, weighted by their populations. Assumes clustering performed with GROMACS yielding `clusters.pdb` and `cluster.xvg` files.
+Result:
+
+![trajectory_label_comparison_3panel](readme_images/trajectory_label_comparison_3panel.png)
+
+## Cluster-Based Calculation
+This approach computes **ensemble-weighted** distributions using RMSD clustering results (e.g., from GROMACS).
+
+Inputs:
+- `clusters.pdb` (cluster representatives)
+- `clust-size.xvg` (cluster populations)
+
+Run:
 
 ```
 python compare_R1_rotlib_clusters.py \
@@ -83,20 +125,40 @@ python compare_R1_rotlib_clusters.py \
     --prefix GTN_sample_5000
 ```
 
-Plot the cluster results. This is similar in structure to `plot_R1_rotlib_traj.py` but reads cluster-weighted ChiLife results.
+Plot cluster-weighted results:
+
 ```
 python plot_cluster_label_comparison.py
 ```
 
-### Compare with MD
-Assumes previously performed ChiLife calculation and GROMACS distance.
+Result:
 
-Overlay MD distribution with cluster-weighted ChiLife distribution.
+![cluster_label_comparison_3panel](readme_images/cluster_label_comparison_3panel.png)
+
+## Comparison with MD
+These scripts overlay ChiLife-derived distributions with MD-based distance distributions (e.g., from GROMACS).
+
+**Cluster-weighted vs MD:**
+
 ```
 python plot_cluster_label_md_comparison.py
 ```
 
-Overlay MD with per-frame ChiLife average distribution.
+Result:
+![cluster_label_vs_md_comparison_3panel](readme_images/cluster_label_vs_md_comparison_3panel.png)
+
+**Trajectory-averaged vs MD:**
+
 ```
-python plot_trajlabel_md_comparison.py
+python plot_traj_label_md_comparison.py
 ```
+
+Result:
+![trajectory_label_vs_md_comparison_3panel](readme_images/trajectory_label_vs_md_comparison_3panel.png)
+
+## Workflow Summary
+1. Run ChiLife on trajectory (chunked SLURM jobs)
+2. Combine outputs
+3. (Optional) Perform clustering and compute weighted distributions
+4. Compare against MD-derived distributions
+5. Visualize results
