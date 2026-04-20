@@ -7,3 +7,8 @@
 *.csv
 
 stride_*/
+
+cluster_output/
+*.ndx
+*.xvg
+*.txt
