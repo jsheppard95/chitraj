@@ -6,7 +6,8 @@
 *.pdb
 *.csv
 
-stride_*/
+tip3p/
+tip4p
 
 cluster_output/
 *.ndx

@@ -48,16 +48,21 @@ Notes:
 Output:
 - Per-frame distance summaries
 - Ensemble-averaged distributions with 95% confidence intervals
-- Results stored in the specified --outdir
+- Results stored in the specified `--outdir`
 
 ## Trajectory-Based Calculation (Parallelized)
 Large trajectories are processed by splitting into chunks and distributing across a SLURM job array.
 
 1. Submit jobs
+
 Edit `submit_array.sh`:
 - `TOP1`, `TRAJ1`, `TOP2`, `TRAJ2`
 - `SITE_COND1`, `SITE_COND2`
 - `MODE` (label type and sampling settings)
+- `CHUNK_SIZE` (as needed, 100 is reasonable)
+- `#SBATCH --array` should cover all frames for the chosen `CHUNK_SIZE`
+  - e.g., for 30001 frame trajectory with chunks of 100, the number of chunks needed is `ceil(30001 / 100) = 301`
+  - array should be `0-299`: `#SBATCH --array=0-299`
 
 Then run:
 

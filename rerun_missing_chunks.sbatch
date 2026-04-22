@@ -18,10 +18,10 @@ conda activate chilife_env
 
 mkdir -p logs "${CHUNK_DIR}"
 
-TOP1="./JS_1bar_equib_tip4p.pdb"
-TRAJ1="./JS_1bar.xtc"
-TOP2="./JS_3kbar_equib_tip4p.pdb"
-TRAJ2="./JS_3kbar.xtc"
+TOP1="./tip3p/JS_1bar_equib.pdb"
+TRAJ1="./tip3p/JS_1bar.xtc"
+TOP2="./tip3p/JS_3kbar_equib.pdb"
+TRAJ2="./tip3p/JS_3kbar.xtc"
 
 SITE1_COND1=406
 SITE2_COND1=537

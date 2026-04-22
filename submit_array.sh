@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=8G
 #SBATCH --time=08:00:00
-#SBATCH --array=0-99
+#SBATCH --array=0-299
 #SBATCH --output=logs/%x_%A_%a.out
 #SBATCH --error=logs/%x_%A_%a.err
 #SBATCH --mail-user=sheppard@ucsb.edu
@@ -27,10 +27,10 @@ START_FRAME=$(( SLURM_ARRAY_TASK_ID * CHUNK_SIZE ))
 # MODE="${MODE:-r1_sample}"
 MODE="${MODE:-gtn_sample}"
 
-TOP1="./JS_1bar_equib_tip4p.pdb"
-TRAJ1="./JS_1bar.xtc"
-TOP2="./JS_3kbar_equib_tip4p.pdb"
-TRAJ2="./JS_3kbar.xtc"
+TOP1="./tip3p/JS_1bar_equib.pdb"
+TRAJ1="./tip3p/JS_1bar.xtc"
+TOP2="./tip3p/JS_3kbar_equib.pdb"
+TRAJ2="./tip3p/JS_3kbar.xtc"
 
 SITE1_COND1=406
 SITE2_COND1=537
