@@ -34,20 +34,20 @@ MODEL_FILES = [
     {
         "name": "R1M_sample_none",
         "title": "R1 Accessible Volume",
-        "dist_csv": BASE_DIR / "stride_1/r1m_sample_none/combined_output/R1_no_sample_trajectory_distributions.csv",
-        "summary_csv": BASE_DIR / "stride_1/r1m_sample_none/combined_output/R1_no_sample_per_frame_summary.csv",
+        "dist_csv": BASE_DIR / "tip4p/stride_1/r1m_sample_none/combined_output/R1_no_sample_trajectory_distributions.csv",
+        "summary_csv": BASE_DIR / "tip4p/stride_1/r1m_sample_none/combined_output/R1_no_sample_per_frame_summary.csv",
     },
     {
         "name": "R1M_sample_5000",
         "title": "R1 Off-Rotamer Sampling",
-        "dist_csv": BASE_DIR / "stride_1/r1m_sample_5000/combined_output/R1_sample_5000_trajectory_distributions.csv",
-        "summary_csv": BASE_DIR / "stride_1/r1m_sample_5000/combined_output/R1_sample_5000_per_frame_summary.csv",
+        "dist_csv": BASE_DIR / "tip4p/stride_1/r1m_sample_5000/combined_output/R1_sample_5000_trajectory_distributions.csv",
+        "summary_csv": BASE_DIR / "tip4p/stride_1/r1m_sample_5000/combined_output/R1_sample_5000_per_frame_summary.csv",
     },
     {
         "name": "GTN",
         "title": "GTN (Gd) Off-Rotamer Sampling",
-        "dist_csv": BASE_DIR / "stride_1/gtn_sample_5000/combined_output/GTN_sample_5000_trajectory_distributions.csv",
-        "summary_csv": BASE_DIR / "stride_1/gtn_sample_5000/combined_output/GTN_sample_5000_per_frame_summary.csv",
+        "dist_csv": BASE_DIR / "tip4p/stride_1/gtn_sample_5000/combined_output/GTN_sample_5000_trajectory_distributions.csv",
+        "summary_csv": BASE_DIR / "tip4p/stride_1/gtn_sample_5000/combined_output/GTN_sample_5000_per_frame_summary.csv",
     },
 ]
 
@@ -202,15 +202,15 @@ def main() -> None:
         ax.set_title(d["title"], fontsize=12, fontweight="bold")
         ax.grid(True, alpha=0.3, linestyle=":", linewidth=0.5)
         ax.legend(loc="upper left", frameon=True, framealpha=0.9, fontsize=10)
-        ax.set_xlim(1.5, 6.0)
+        ax.set_xlim(1.5, 8.0)
         ax.set_ylim(0.0, ylimit)
 
     axes[-1].set_xlabel(r"Distance (nm)", fontsize=12)
 
     fig.tight_layout()
 
-    out_png = BASE_DIR / "stride_1/trajectory_label_comparison_3panel.png"
-    out_pdf = BASE_DIR / "stride_1/trajectory_label_comparison_3panel.pdf"
+    out_png = BASE_DIR / "tip4p/stride_1/trajectory_label_comparison_3panel.png"
+    out_pdf = BASE_DIR / "tip4p/stride_1/trajectory_label_comparison_3panel.pdf"
     fig.savefig(out_png, dpi=1200, bbox_inches="tight")
     fig.savefig(out_pdf, bbox_inches="tight")
 

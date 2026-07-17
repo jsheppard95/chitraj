@@ -37,13 +37,14 @@ def mean_from_distribution(r_nm: np.ndarray, P: np.ndarray) -> float:
     return np.sum(r_nm * P) / denom
 
 
-def bootstrap_mean_distribution(
+def block_bootstrap_mean_distribution(
     P_frames: np.ndarray,
+    block_size: int,
     n_boot: int = 1000,
     rng: np.random.Generator | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Naive bootstrap over frames.
+    Moving-block bootstrap over frames.
     P_frames shape = (n_frames, n_r)
     Returns lower/upper 95% CI for mean P(r).
     """
@@ -54,11 +55,16 @@ def bootstrap_mean_distribution(
     if n_frames == 0:
         raise ValueError("P_frames is empty")
 
+    n_blocks = int(np.ceil(n_frames / block_size))
     boot_means = np.empty((n_boot, P_frames.shape[1]), dtype=float)
 
     for i in range(n_boot):
-        idx = rng.integers(0, n_frames, size=n_frames)
-        boot_means[i] = P_frames[idx].mean(axis=0)
+        resampled = []
+        for _ in range(n_blocks):
+            start = rng.integers(0, max(1, n_frames - block_size + 1))
+            resampled.append(P_frames[start:start + block_size])
+        resampled = np.concatenate(resampled, axis=0)[:n_frames]
+        boot_means[i] = resampled.mean(axis=0)
 
     lower = np.percentile(boot_means, 2.5, axis=0)
     upper = np.percentile(boot_means, 97.5, axis=0)
@@ -266,9 +272,13 @@ def main():
     mean_P_1bar = np.mean(P_frames_1bar, axis=0)
     mean_P_3kbar = np.mean(P_frames_3kbar, axis=0)
 
-    # Bootstrap 95% CI for mean distribution
-    lo_1bar, hi_1bar = bootstrap_mean_distribution(P_frames_1bar, n_boot=args.n_boot)
-    lo_3kbar, hi_3kbar = bootstrap_mean_distribution(P_frames_3kbar, n_boot=args.n_boot)
+    # Block bootstrap 95% CI for mean distribution
+    lo_1bar, hi_1bar = block_bootstrap_mean_distribution(
+        P_frames_1bar, block_size=args.block_size, n_boot=args.n_boot
+    )
+    lo_3kbar, hi_3kbar = block_bootstrap_mean_distribution(
+        P_frames_3kbar, block_size=args.block_size, n_boot=args.n_boot
+    )
 
     # Scalar mean distances and block bootstrap CI
     mean_r_1bar = np.mean(mean_r_frames_1bar)

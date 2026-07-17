@@ -5,6 +5,7 @@
 *.xtc
 *.pdb
 *.csv
+*.un~
 
 tip3p/
 tip4p
@@ -13,3 +14,5 @@ cluster_output/
 *.ndx
 *.xvg
 *.txt
+
+__pycache__/

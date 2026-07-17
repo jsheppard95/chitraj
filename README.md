@@ -161,9 +161,51 @@ python plot_traj_label_md_comparison.py
 Result:
 ![trajectory_label_vs_md_comparison_3panel](readme_images/trajectory_label_vs_md_comparison_3panel.png)
 
+## Block-Bootstrap for Confidence Interval Estimation
+Molecular dynamics trajectories produce highly correlated conformations. The number of independent
+samples is estimated using block-bootstrap resampling, with a window size determined by the
+autocorrelation time for the residue-residue distance of interest. Given MD distance data, calculate the autocorrelation time using:
+
+```
+python estimate_autocorrelation_time.py
+```
+Results:
+![md_distance_autocorrelation](readme_images/md_distance_autocorrelation.png)
+
+| Condition | τ (frames) | τ (ns) | ACF zero-crossing (frames) | Effective independent samples (of 30,001 frames) |
+| --------- | ---------- | ------ |--------------------------- | ------------------------------------------------ |
+| 1 bar     | 1435       | 14.4   | 3153                       | 21                                               |
+| 3 kbar    | 2453       | 24.5   | 3452                       | 12                                               |
+
+Here, we set the block size to twice the more conservative maximum over both conditions (in this case 3 kbar):
+4900 frames.
+
+Generate confidence intervals using `combine_chilife_chunks.py`:
+```
+python combine_chilife_chunks.py \
+    --chunk-dir stride_1/gtn_sample_5000/chunk_output \
+    --prefix GTN_sample_5000 \
+    --outdir stride_1/gtn_sample_5000/combined_output \
+    --n-boot 2000 \
+    --block-size 4900
+```
+ChiLife Distribution Results:
+
+![trajectory_label_comparison_3panel_block_boot](readme_images/trajectory_label_comparison_3panel_block_boot.png)
+
+A similar procedure is applied to the MD-derived distance distributions:
+
+```
+python make_md_distribution.py --block-size 4900 --n-boot 2000
+python plot_md_distribution.py
+```
+
+MD Distribution Results:
+![MD_trajectory_distributions](readme_images/MD_trajectory_distributions.png)
+
 ## Workflow Summary
 1. Run ChiLife on trajectory (chunked SLURM jobs)
-2. Combine outputs
+2. Combine outputs (block bootstrap for CI estimation)
 3. (Optional) Perform clustering and compute weighted distributions
 4. Compare against MD-derived distributions
 5. Visualize results
