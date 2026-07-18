@@ -1,0 +1,20 @@
+{
+  "title": "chitraj: Tools for computing and comparing DEER distance distributions from MD trajectories using ChiLife",
+  "description": "chitraj provides tools for computing and comparing DEER (double electron-electron resonance) distance distributions from molecular dynamics (MD) trajectories using ChiLife. It supports trajectory-based (frame-by-frame) and cluster-based (ensemble-weighted) averaging of spin-label rotamer distributions between specified residue pairs.",
+  "upload_type": "software",
+  "license": "MIT",
+  "creators": [
+    {
+      "name": "Sheppard, Jackson",
+      "affiliation": "University of California, Santa Barbara"
+    }
+  ],
+  "access_right": "open",
+  "keywords": [
+    "molecular dynamics",
+    "DEER",
+    "spin labeling",
+    "ChiLife",
+    "distance distribution"
+  ]
+}
