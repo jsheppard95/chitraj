@@ -1,5 +1,7 @@
 # chitraj
 
+[![DOI](https://zenodo.org/badge/1206416573.svg)](https://doi.org/10.5281/zenodo.21422883)
+
 Tools for computing and comparing DEER distance distributions from MD trajectories using ChiLife.
 
 ## Installation
